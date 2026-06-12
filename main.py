@@ -1,5 +1,19 @@
+import os
+
 import numpy as np
 from config import *
+import tensorflow as tf
+
+tf_device = os.environ.get("DUALMATCH_TF_DEVICE", "cpu").lower()
+if tf_device == "cpu":
+    try:
+        tf.config.set_visible_devices([], "GPU")
+        print("Using TensorFlow device: CPU")
+    except RuntimeError as exc:
+        print("Could not disable TensorFlow GPU:", exc)
+else:
+    print("Using TensorFlow device: GPU")
+
 import utils2
 from utils import *
 from models import *
@@ -15,11 +29,19 @@ import pandas as pd
 import dto
 import time
 
-gpu_options = tf.compat.v1.GPUOptions(allow_growth=True)
-config = tf.compat.v1.ConfigProto(gpu_options=gpu_options)
-# config.gpu_options.per_process_gpu_memory_fraction = 0.3
-sess = tf.compat.v1.Session(config=config)
-tf.compat.v1.keras.backend.set_session(sess)
+set_tf_session = getattr(tf.compat.v1.keras.backend, 'set_session', None)
+if set_tf_session is not None and tf_device != "cpu":
+    gpu_options = tf.compat.v1.GPUOptions(allow_growth=True)
+    config = tf.compat.v1.ConfigProto(gpu_options=gpu_options)
+    # config.gpu_options.per_process_gpu_memory_fraction = 0.3
+    sess = tf.compat.v1.Session(config=config)
+    set_tf_session(sess)
+elif tf_device != "cpu":
+    for gpu in tf.config.list_physical_devices('GPU'):
+        try:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        except RuntimeError:
+            pass
 
 import seu_tkg as seu
 

@@ -15,16 +15,19 @@ class evaluate:
 
         def dot(tensor):
             k = 10
-            A, B = [K.squeeze(matrix, axis=0) for matrix in tensor]
-            A_sim = K.dot(A, K.transpose(B))
-            return K.expand_dims(A_sim, axis=0)
+            A, B = [tf.squeeze(matrix, axis=0) for matrix in tensor]
+            A_sim = tf.matmul(A, tf.transpose(B))
+            return tf.expand_dims(A_sim, axis=0)
 
-        results = Lambda(dot)([Matrix_A,Matrix_B])
+        results = Lambda(dot, output_shape=(None, None))([Matrix_A,Matrix_B])
         self.sim_model = keras.Model(inputs=[Matrix_A, Matrix_B], outputs = results)
 
         k = 10
         Matrix_A = Input(shape=(None, None))
-        results = Lambda(lambda x: K.expand_dims(K.sum(tf.nn.top_k(K.squeeze(x, axis=0), k=k)[0], axis=-1) / k, axis=0))(Matrix_A)
+        results = Lambda(
+            lambda x: tf.expand_dims(tf.reduce_sum(tf.nn.top_k(tf.squeeze(x, axis=0), k=k)[0], axis=-1) / k, axis=0),
+            output_shape=(None,)
+        )(Matrix_A)
         self.avg_model = keras.Model(inputs = [Matrix_A], outputs=results)
 
         Matrix_A = Input(shape=(None, None))
@@ -32,14 +35,14 @@ class evaluate:
         RL_input = Input(shape=( None,))
         Ans_input = Input(shape=(None,))
         def CSLS(tensor):
-            sim, LR, RL, _ = [K.squeeze(m, axis=0) for m in tensor]
-            LR, RL = [K.expand_dims(m, axis=1) for m in [LR,RL]]
-            sim = 2*sim - K.transpose(LR)
+            sim, LR, RL, _ = [tf.squeeze(m, axis=0) for m in tensor]
+            LR, RL = [tf.expand_dims(m, axis=1) for m in [LR,RL]]
+            sim = 2*sim - tf.transpose(LR)
             sim = sim - RL
             rank = tf.argsort(-sim, axis=-1)
-            return K.expand_dims(rank[:,0], axis=0)
+            return tf.expand_dims(rank[:,0], axis=0)
 
-        rank = Lambda(CSLS)([Matrix_A, LR_input, RL_input, Ans_input])
+        rank = Lambda(CSLS, output_shape=(None,))([Matrix_A, LR_input, RL_input, Ans_input])
         self.rank_model = keras.Model(inputs = [Matrix_A, LR_input, RL_input, Ans_input],outputs = rank)
 
         Matrix_A = Input(shape=(None, None))
@@ -48,15 +51,15 @@ class evaluate:
         Ans_input = Input(shape=(None,))
 
         def CSLS(tensor):
-            sim, LR, RL, ans_rank = [K.squeeze(m,axis=0) for m in tensor]
-            LR, RL, ans_rank = [K.expand_dims(m,axis=1) for m in [LR, RL, ans_rank]]
-            sim = 2*sim - K.transpose(LR)
+            sim, LR, RL, ans_rank = [tf.squeeze(m,axis=0) for m in tensor]
+            LR, RL, ans_rank = [tf.expand_dims(m,axis=1) for m in [LR, RL, ans_rank]]
+            sim = 2*sim - tf.transpose(LR)
             sim = sim - RL
             rank = tf.argsort(-sim,axis=-1)
-            results = tf.where(tf.equal(rank,K.cast(K.tile(ans_rank, [1, len(self.dev_pair)]), dtype="int32")))
-            return K.expand_dims(results,axis=0)
+            results = tf.where(tf.equal(rank, tf.cast(tf.tile(ans_rank, [1, len(self.dev_pair)]), dtype="int32")))
+            return tf.expand_dims(results,axis=0)
 
-        results = Lambda(CSLS)([Matrix_A, LR_input, RL_input, Ans_input])
+        results = Lambda(CSLS, output_shape=(None, 2))([Matrix_A, LR_input, RL_input, Ans_input])
         self.CSLS_model = keras.Model(inputs = [Matrix_A, LR_input, RL_input, Ans_input], outputs = results)
 
     def CSLS_cal(self, Lvec,Rvec,evaluate = True,batch_size = 1024):

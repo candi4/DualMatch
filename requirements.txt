@@ -1,0 +1,9 @@
+numpy==1.26.4
+numba
+tensorflow
+scipy
+# torch_scatter
+tqdm
+grakel
+pandas
+openpyxl
